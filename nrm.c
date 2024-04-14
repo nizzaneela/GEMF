@@ -34,6 +34,7 @@ void dump_heap( Heap* heap);
 void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_out);
 int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
+    FILE *fil_fai;
     size_t j, layer, compartment, section;
     size_t count= 0;
     int k;
@@ -296,17 +297,64 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             heart_beat(&hb);
         }
         printf("stop simulation round [%zu/%zu]\n", round, run->sim_rounds);
-        if(++round> run->sim_rounds){
+        // stop if the simulation was successful
+        if(++round> run->sim_rounds &&
+                (sts->init_cnt[0] == 4950000 ||
+                    (sts->init_cnt[0] <= 4999600 &&
+                        (sts->init_cnt[1] ||
+                            sts->init_cnt[2] ||
+                            sts->init_cnt[3] ||
+                            sts->init_cnt[4] ||
+                            sts->init_cnt[5] ||
+                            sts->init_cnt[6]
+                        )
+                    )
+                )
+            ){
             break;
         }
-        //restore original status and run again
-        R= restore.R;
-        memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
-        memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
-        for(layer= 0; layer< graph->L; layer++){
-            memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // otherwise, reset and try again
+        // reset all nodes to susceptible
+        for( i= graph->_s; i< graph->_e; i++){
+            if( sts->init_lst[i]){
+                sts->init_lst[i] = 0;
+            }
         }
-        LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
+        // set a new primary case (to 2, as in Pekar)
+        evt.ns = (int)((rand() / (double)RAND_MAX) * graph->_e);
+        sts->init_lst[evt.ns] = 2;
+        // set compartment populations
+        sts->init_cnt[0] = 4999999;
+        sts->init_cnt[1] = 0;
+        sts->init_cnt[2] = 1;
+        for( compartment= 3; compartment< sts->M+ sts->_s; compartment++){
+            sts->init_cnt[compartment] = 0;
+        }
+        // free rate and inducer lists
+        for( layer= 0; layer< graph->L; layer++){
+            free( p_inducer_cal_lst[layer]);
+        }
+        free( p_inducer_cal_lst);
+        free( p_raw_rat_lst);
+        // intialise new rate and inducer lists
+        p_inducer_cal_lst=  init_inducer( graph, sts, tran);
+        R= get_rat_lst( graph, tran, sts, &p_raw_rat_lst, p_inducer_cal_lst);
+        // close output and open a new file
+        fclose( fil_out);
+        fil_out= fopen( run->out_file, "w");
+        if( fil_out== NULL){
+            printf("open output file[%s] faild\n", run->out_file);
+            return -1;
+        }
+        // old code for resetting initial conditions
+        // //restore original status and run again
+        // R= restore.R;
+        // memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
+        // memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
+        // for(layer= 0; layer< graph->L; layer++){
+        //     memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // }
+        // LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
     }
     //post population
     if( run->sim_rounds<=1){
@@ -372,6 +420,14 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     }
 
     fclose( fil_out);
+    // Write failures
+    fil_fai = fopen("failures.txt", "w");
+    if (fil_fai == NULL) {
+        printf("Error opening file for recording failures!\n");
+        return 1;
+    }
+    fprintf(fil_fai, "%ld failures before success", round -2);
+    fclose(fil_fai);
     LOG(1, __FILE__, __LINE__, "End clean up\n");
     return 0;
 }
