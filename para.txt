@@ -81,13 +81,13 @@
 1
 
 [DATA_FILE]
-network.txt
-network.txt
-network.txt
-network.txt
+DUMMY
+DUMMY
+DUMMY
+DUMMY
 
 [STATUS_FILE]
-status.txt
+DUMMY
 
 [OUT_FILE]
 output.txt
