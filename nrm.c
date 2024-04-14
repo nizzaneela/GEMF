@@ -39,7 +39,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_tra;
     size_t j, layer, compartment, section;
     size_t count= 0;
-    int k;
+    int k, primary_case;
     NINT beg_num, end_num, cur_nod, i;
     int** p_nsim_avg_lst= NULL;
     //double T= 0.0;
@@ -92,8 +92,8 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         }
     }
     // set a new primary case (at compartment 2, as in Pekar)
-    evt.ns = (int)((rand() / (double)RAND_MAX) * graph->_e);
-    sts->init_lst[evt.ns] = 2;
+    primary_case = (int)((rand() / (double)RAND_MAX) * graph->_e);
+    sts->init_lst[primary_case] = 2;
     // set compartment populations
     sts->init_cnt[0] = 4999999;
     sts->init_cnt[1] = 0;
@@ -124,7 +124,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         printf("open transmission network file[%s] failed\n", "transmission_network.txt");
         return -1;
     }
-    fprintf(fil_tra, "None\t%d\t0.0\n", evt.ns);
+    fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
 
     // ***********************events happen***************************************
     if( run->sim_rounds> 1){
@@ -197,14 +197,27 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             if( run->sim_rounds<=1){
                 sts->init_cnt[evt.ni] --;
                 sts->init_cnt[evt.nj] ++;
-                fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
-                for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
-                    fprintf( fil_out, " %d", sts->init_cnt[compartment]);
+                //  only write to output if primary case
+                if( evt.ns == primary_case ||
+                    // or ascertained
+                    evt.nj == 3 ||
+                    // or ascertained and recovering
+                    (evt.ni == 3 && evt.nj == 7) ||
+                    // or hospitalized
+                    evt.nj == 6 ||
+                    // or hospitalized and recovering
+                    (evt.ni == 6 && evt.nj == 7)){
+                    // only write time, node and status change
+                    fprintf( fil_out, "%lf "fmt_n" %zu %zu\n", elapse_tim, evt.ns, evt.ni, evt.nj);
                 }
-                if(run->show_inducer){
-                    print_inducer( graph, tran, sts, &evt, fil_out);
-                }
-                fprintf( fil_out, "\n");
+                // fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
+                // for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
+                //     fprintf( fil_out, " %d", sts->init_cnt[compartment]);
+                // }
+                // if(run->show_inducer){
+                //     print_inducer( graph, tran, sts, &evt, fil_out);
+                // }
+                // fprintf( fil_out, "\n");
                 //if a new infection, write to tranmission network
                 if( evt.ni == 0){
                     print_transmission( graph, tran, sts, &evt, fil_tra, elapse_tim, p_raw_rat_lst);
@@ -352,8 +365,8 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             }
         }
         // set a new primary case (to 2, as in Pekar)
-        evt.ns = (int)((rand() / (double)RAND_MAX) * graph->_e);
-        sts->init_lst[evt.ns] = 2;
+        primary_case = (int)((rand() / (double)RAND_MAX) * graph->_e);
+        sts->init_lst[primary_case] = 2;
         // set compartment populations
         sts->init_cnt[0] = 4999999;
         sts->init_cnt[1] = 0;
@@ -385,7 +398,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             return -1;
         }
         // write the new first line of the new file
-        fprintf(fil_tra, "None\t%d\t0.0\n", evt.ns);
+        fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
         // old code for resetting initial conditions
         // //restore original status and run again
         // R= restore.R;
