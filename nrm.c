@@ -83,6 +83,23 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         }
     }
 
+    // set all nodes to susceptible
+    for( i= graph->_s; i< graph->_e; i++){
+        if( sts->init_lst[i]){
+            sts->init_lst[i] = 0;
+        }
+    }
+    // set a new primary case (at compartment 2, as in Pekar)
+    evt.ns = (int)((rand() / (double)RAND_MAX) * graph->_e);
+    sts->init_lst[evt.ns] = 2;
+    // set compartment populations
+    sts->init_cnt[0] = 4999999;
+    sts->init_cnt[1] = 0;
+    sts->init_cnt[2] = 1;
+    for( compartment= 3; compartment< sts->M+ sts->_s; compartment++){
+        sts->init_cnt[compartment] = 0;
+    }
+
     //init inducer list
     p_inducer_cal_lst=  init_inducer( graph, sts, tran);
     //init adjacency index list

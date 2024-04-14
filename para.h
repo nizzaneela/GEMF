@@ -116,7 +116,7 @@ int fcheck_config(FILE* file, char* target_section, size_t row, size_t column);
  *        int*  ini_sts_cnt     [ status count list, length compartment_qtt]
  *return: int   [0: success; <0: failure]
  */
-int initial_con(FILE* fil_sts, Graph* graph, Status* sts);
+int initial_con( Graph* graph, Status* sts);
 
 //sscanf with moving pointer
 int _auto_sscanf(char** str, char* format, ...);
