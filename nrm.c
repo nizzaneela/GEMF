@@ -61,7 +61,6 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         dump_graph(graph);
         dump_status(sts);
     }
-    srand((unsigned int)sts->random_seed);
     //start timer
     timer0= gettimenow();
 
@@ -77,8 +76,9 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         }
     }
     else{
-        for( layer= 0; layer< graph->L; layer++){
-            qsort( graph->edge[layer], graph->E[layer], sizeof( Edge), Edge_cmp);
+        qsort( graph->edge[layer], graph->E[layer], sizeof( Edge), Edge_cmp);
+        for( layer= 1; layer< graph->L; layer++){
+            memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
         }
     }
 
