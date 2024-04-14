@@ -189,6 +189,32 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                 p_nsim_avg_lst[evt.nj - sts->_s][section] ++;
             }
 
+            // divert events after the 50,000th infection to prevent further transmissions
+            if( sts->init_cnt[0] == 4950000){
+                // update using nodal transitions only
+                tmp_double= tran->nodal_trn[evt.nj][sts->M+ sts->_s];
+                reaction.t= - log(rand()/(double)(RAND_MAX))/(tmp_double)+ elapse_tim;
+                reaction.n= evt.ns;
+                heap_update(&heap, &reaction);
+                R= R+ tmp_double - p_raw_rat_lst[evt.ns];
+                p_raw_rat_lst[evt.ns]= tmp_double;
+                // for the last infection, go through every event in the heap and, if the node is susceptible, set reaction time to inf and rate to zero, then resort the heap, updating collective rate is unnecessary but done anyway
+                if( evt.ni==0){
+                    R = 0;
+                    for( i= graph->_s; i< graph->_e; i++){
+                        if( sts->init_lst[heap.reaction[i].n]==0){
+                            heap.reaction[i].t = DBL_MAX;
+                            p_raw_rat_lst[heap.reaction[i].n] = 0;
+                        }
+                        else{
+                            R+=p_raw_rat_lst[heap.reaction[i].n];
+                        }
+                    }
+                    heap_sort(&heap);
+                }
+                continue;
+            }
+
             //update rates
             //1. ni->nj
             //nodal transition rate
