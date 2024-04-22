@@ -92,7 +92,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         }
     }
     // set a new primary case (at compartment 2, as in Pekar)
-    primary_case = (int)((rand() / (double)RAND_MAX) * graph->_e);
+    primary_case = (int)(rand() / ((double)RAND_MAX + 1.0) * graph->_e);
     sts->init_lst[primary_case] = 2;
     // set compartment populations
     sts->init_cnt[0] = 4999999;
@@ -365,7 +365,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             }
         }
         // set a new primary case (to 2, as in Pekar)
-        primary_case = (int)((rand() / (double)RAND_MAX) * graph->_e);
+        primary_case = (int)(rand() / ((double)RAND_MAX + 1.0) * graph->_e);
         sts->init_lst[primary_case] = 2;
         // set compartment populations
         sts->init_cnt[0] = 4999999;
@@ -924,7 +924,7 @@ void print_transmission( Graph* graph, Transition* tran, Status *sts, Event* evt
     int rates = 0;
     int weighted_index;
     // if the node's rate is less than double the lowest edge rate, we have one inducer'
-    if( p_raw_rat_lst[evt->ns] < (2*tran->edge_trn[0][0][1])){
+    if( p_raw_rat_lst[evt->ns] < (1.9*tran->edge_trn[0][0][1])){
         // got through each edge of the newly infected node
         for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
             // if the status of the node at the other end of the edge is an inducer, that is it
@@ -952,7 +952,7 @@ void print_transmission( Graph* graph, Transition* tran, Status *sts, Event* evt
 
         }
         // get a random integer up to the rates total
-        weighted_index = (int)((rand() / (double)RAND_MAX) * rates);
+        weighted_index = (int)(rand() / ((double)RAND_MAX + 1.0) * rates);
         // reset rates, go through again until rates reaches the index
         rates = 0;
         for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
