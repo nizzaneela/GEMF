@@ -242,7 +242,12 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             if( sts->init_cnt[0] == 4950000){
                 // update using nodal transitions only
                 tmp_double= tran->nodal_trn[evt.nj][sts->M+ sts->_s];
-                reaction.t= - log(rand()/(double)(RAND_MAX))/(tmp_double)+ elapse_tim;
+                if( tmp_double> FLT_EPSILON){
+                    reaction.t= - log(rand()/(double)(RAND_MAX))/(tmp_double)+ elapse_tim;
+                }
+                else{
+                    reaction.t= DBL_MAX;
+                }
                 reaction.n= evt.ns;
                 heap_update(&heap, &reaction);
                 R= R+ tmp_double - p_raw_rat_lst[evt.ns];
