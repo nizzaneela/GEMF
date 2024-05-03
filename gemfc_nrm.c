@@ -223,7 +223,7 @@ void load_graph(FILE* fil_para, Graph* graph){
     const int n = 5000000;
     int i, j, k;
     int new_nodes_edge_targets[m];
-    int *edge_ends = malloc(2 * n * m * sizeof(int));
+    int *edge_ends = malloc((m + 2*m*(n-m)) * sizeof(int));
     size_t layer;
     double t0= gettimenow();
 
@@ -240,11 +240,11 @@ void load_graph(FILE* fil_para, Graph* graph){
     // as implemented in niema_graph_generator https://github.com/niemasd/NiemaGraphGen/blob/main/barabasi_albert.cpp
     for (i = m; i < n; ++i) {
         for (j = 0; j < m; ++j) {
-            new_nodes_edge_targets[j] = edge_ends[rand() % (m + 2*m*(i-m))];
+            new_nodes_edge_targets[j] = edge_ends[(int)(rand()/(RAND_MAX + 1.0) * (m + 2*m*(i-m)))];
             // check each new value against the ones we have already incase it is a duplicate
             for (k = 0; k < j; ++k) {
                 if (new_nodes_edge_targets[k] == new_nodes_edge_targets[j]){
-                    new_nodes_edge_targets[j] = edge_ends[rand() % (m + 2*m*(i-m))];
+                    new_nodes_edge_targets[j] = edge_ends[(int)(rand()/(RAND_MAX + 1.0) * (m + 2*m*(i-m)))];
                     k = 0;
                 }
             }
