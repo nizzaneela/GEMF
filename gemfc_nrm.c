@@ -227,7 +227,7 @@ void load_graph(FILE* fil_para, Graph* graph){
     //read in network matrix [i j weight]
     locate_section( fil_para, "[DATA_FILE]");
     fil_nam= (char*)malloc(sizeof(char)*MAX_LINE_LEN);
-    for(layer=0; layer< graph->L; layer++){
+    for(layer=0; layer< 1; layer++){
         LOG(2, __FILE__, __LINE__, "Read layer[%d]\n", layer+ 1);
         fget_next_item( fil_para, fil_nam, MAX_LINE_LEN);
         fil_dat= fopen( fil_nam, "r");
@@ -308,6 +308,9 @@ void load_graph(FILE* fil_para, Graph* graph){
         }
 
         fclose(fil_dat);
+    }
+    for(layer=1; layer< graph->L; layer++){
+        graph->E[layer]+=  graph->E[layer];
     }
     time_print( "initial time cost[ ", gettimenow() - t0, " ]\n");
     free(fil_nam);
