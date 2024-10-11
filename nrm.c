@@ -81,8 +81,9 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         }
     }
     else{
+        Edge_tim_sort( graph->edge[0], graph->E[0]);
         for( layer= 0; layer< graph->L; layer++){
-            Edge_tim_sort( graph->edge[layer], graph->E[layer]);
+            memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
         }
     }
 
