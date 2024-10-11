@@ -5,6 +5,10 @@
 #include <float.h>
 #include <string.h>
 
+#define SORT_NAME Edge
+#define SORT_TYPE Edge
+#define SORT_CMP(x, y)  ((x).i < (y).i ? -1 : ((y).i < (x).i ? 1 : 0))
+#include "sort.h"
 
 /*
  * nrm.c of GEMF in C language
@@ -78,7 +82,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     }
     else{
         for( layer= 0; layer< graph->L; layer++){
-            qsort( graph->edge[layer], graph->E[layer], sizeof( Edge), Edge_cmp);
+            Edge_tim_sort( graph->edge[layer], graph->E[layer]);
         }
     }
 
