@@ -217,103 +217,12 @@ void del_run(Run* run){
     if( run->out_file!= NULL) free (run->out_file);
 }
 void load_graph(FILE* fil_para, Graph* graph){
-    printf("Reading network...\n");
-    FILE* fil_dat= NULL;
-    char* fil_nam= NULL;
-    NINT tr, i, j;
-    int ret;
-    size_t li, layer;
-    double t0= gettimenow();
-    //read in network matrix [i j weight]
-    locate_section( fil_para, "[DATA_FILE]");
-    fil_nam= (char*)malloc(sizeof(char)*MAX_LINE_LEN);
-    for(layer=0; layer< 1; layer++){
-        LOG(2, __FILE__, __LINE__, "Read layer[%d]\n", layer+ 1);
-        fget_next_item( fil_para, fil_nam, MAX_LINE_LEN);
-        fil_dat= fopen( fil_nam, "r");
-        if( fil_dat== NULL){
-            printf("Read file[%s] error\n", fil_nam);
-            exit( -1);
-        }
-        //skip comment lines on top
-        skip_top_comment( fil_dat, '#');
-        //weighted
-        if( graph->weighted){
-            LOG(2, __FILE__, __LINE__, "Read weighted network\n");
-            for ( li= 0; li< graph->E[layer]; li++) {
-                if (!(li % 10000000)&& li) {
-                    time_print("[", gettimenow() - t0, " ]\t");
-                    printf("layer[%zu] ", layer+ 1);
-                    kilobit_print("[ ", (LONG)li, "/");
-                    kilobit_print("", (LONG)graph->E[layer], " ] edges get\n");
-                }
-                ret= fscanf( fil_dat, fmt_n fmt_n " %lf", &i, &j, &(graph->edge_w[layer][li].w));
-                if( ret != 3){
-                    printf("Error! Expecting 3 columns, getting %d\n", ret);
-                    exit(-1);
-                }
-                if( i< graph->_s || i> graph->_e){
-                    printf("node["fmt_n"of layer[%zu]edge[%zu] out of range["fmt_n"/"fmt_n"]\n", i, layer, li, graph->_s, graph->_e);
-                }
-                if( j< graph->_s || j> graph->_e){
-                    printf("node["fmt_n"of layer[%zu]edge[%zu] out of range["fmt_n"/"fmt_n"]\n", j, layer, li, graph->_s, graph->_e);
-                }
-                graph->edge_w[layer][li].i= i;
-                graph->edge_w[layer][li].j= j;
-                if( !graph->directed){
-                    graph->edge_w[layer][graph->E[layer]+ li]= graph->edge_w[layer][li];
-                    tr= graph->edge_w[layer][graph->E[layer]+ li].i;
-                    graph->edge_w[layer][graph->E[layer]+ li].i= graph->edge_w[layer][graph->E[layer]+ li].j;
-                    graph->edge_w[layer][graph->E[layer]+ li].j= tr;
-                }
-            }
-        }
-        //unweighted
-        else{
-            LOG(2, __FILE__, __LINE__, "Read unweighted network\n");
-            for ( li= 0; li< graph->E[layer]; li++) {
-                if (!(li % 10000000)&& li) {
-                    time_print("[", gettimenow() - t0, " ]\t");
-                    printf("layer[%zu] ", layer+ 1);
-                    kilobit_print("[ ", (LONG)li, "/");
-                    kilobit_print("", (LONG)graph->E[layer], " ] edges get\n");
-                }
-                ret= fscanf( fil_dat, fmt_n fmt_n , &i, &j);
-                if( ret != 2){
-                    printf("Error! Expecting 2 columns, getting %d\n", ret);
-                    exit(-1);
-                }
-                if( i< graph->_s || i> graph->_e){
-                    printf("node["fmt_n"of layer[%zu]edge[%zu] out of range["fmt_n"/"fmt_n"]\n", i, layer, li, graph->_s, graph->_e);
-                }
-                if( j< graph->_s || j> graph->_e){
-                    printf("node["fmt_n"of layer[%zu]edge[%zu] out of range["fmt_n"/"fmt_n"]\n", j, layer, li, graph->_s, graph->_e);
-                }
-                graph->edge[layer][li].i= i;
-                graph->edge[layer][li].j= j;
-                if( !graph->directed){
-                    graph->edge[layer][graph->E[layer]+ li]= graph->edge[layer][li];
-                    tr= graph->edge[layer][graph->E[layer]+ li].i;
-                    graph->edge[layer][graph->E[layer]+ li].i= graph->edge[layer][graph->E[layer]+ li].j;
-                    graph->edge[layer][graph->E[layer]+ li].j= tr;
-                }
-            }
-        }
-        time_print("[", gettimenow() - t0, " ]\t");
-        printf("layer[%zu] ", layer+ 1);
-        kilobit_print("[ ", (LONG)li, "/");
-        kilobit_print("", (LONG)graph->E[layer], " ] edges get\n");
+    size_t layer;
+    for(layer=0; layer< graph->L; layer++){
         if( !graph->directed){
             graph->E[layer]+=  graph->E[layer];
         }
-
-        fclose(fil_dat);
     }
-    for(layer=1; layer< graph->L; layer++){
-        graph->E[layer]+=  graph->E[layer];
-    }
-    time_print( "initial time cost[ ", gettimenow() - t0, " ]\n");
-    free(fil_nam);
 }
 void pre_init_graph(FILE* fil_para, Graph* graph){
     LINE str;

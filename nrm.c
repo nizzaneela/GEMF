@@ -37,6 +37,7 @@ double get_tau( Heap* heap, NINT n);
 void heap_update( Heap* heap, Reaction *reaction);
 void dump_heap( Heap* heap);
 void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_out);
+void generate_graph(Graph* graph);
 int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
     size_t j, layer, compartment, section;
@@ -75,18 +76,8 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     heap._s= 0;
     heap._e= 0;
     heap.V= 0;
-    //sort graph
-    if( graph->weighted){
-        for( layer= 0; layer< graph->L; layer++){
-            qsort( graph->edge_w[layer], graph->E[layer], sizeof( Edge_w), Edge_cmp);
-        }
-    }
-    else{
-        Edge_tim_sort( graph->edge[0], graph->E[0]);
-        for( layer= 0; layer< graph->L; layer++){
-            memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
-        }
-    }
+    //generate and sort graph
+    generate_graph(graph);
 
     //init inducer list
     p_inducer_cal_lst=  init_inducer( graph, sts, tran);
@@ -789,4 +780,64 @@ void print_inducer( Graph* graph, Transition* tran, Status* sts, Event* evt, FIL
         }
     }
     fprintf( fil_out, "]");
+}
+
+void generate_graph(Graph* graph){
+    printf("Generating network...\n");
+
+    const int m = 8;         // Initial number of nodes
+    const int n = 5000000;    // Total number of nodes to be generated
+    int i, j, k;
+    int new_nodes_edge_targets[m];
+    int *edge_ends = malloc((m + 2 * m * (n - m)) * sizeof(int));
+    size_t layer;
+    double t0 = gettimenow();
+
+    if (edge_ends == NULL) {
+        perror("Error allocating memory");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the edge end list with eight unconnected nodes
+    for (i = 0; i < m; ++i) {
+        edge_ends[i] = i;
+    }
+
+    // Add nodes until we have n total
+    for (i = m; i < n; ++i) {
+        // For each new node, connect it with edges to m different nodes from the edge end list
+        for (j = 0; j < m; ++j) {
+            int is_duplicate;
+            do {
+                // draw random node from the edge end list (this provides preferential attachment)
+                new_nodes_edge_targets[j] = edge_ends[(int)pcg32_boundedrand(m + 2 * m * (i - m))];
+                // Check each new node against the previous ones and draw again if duplicate
+                is_duplicate = 0;
+                for (k = 0; k < j; ++k) {
+                    if (new_nodes_edge_targets[k] == new_nodes_edge_targets[j]) {
+                        is_duplicate = 1;
+                        break;
+                    }
+                }
+            } while (is_duplicate);
+        }
+        // for each edge of the new node, add the nodes to edge ends and the edges to the edge list
+        for (j = 0; j < m; ++j) {
+            // Add the nodes to edge ends
+            edge_ends[m + 2 * m * (i - m) + 2 * j] = i;
+            edge_ends[m + 2 * m * (i - m) + 2 * j + 1] = new_nodes_edge_targets[j];
+            // Add the edges to the edge list
+            graph->edge[0][m*(i - m) + j].i= i;
+            graph->edge[0][m*(i - m) + j].j= new_nodes_edge_targets[j];
+            graph->edge[0][graph->E[0]/2+ m*(i - m) + j].i= new_nodes_edge_targets[j];
+            graph->edge[0][graph->E[0]/2+ m*(i - m) + j].j= i;
+        }
+    }
+    free(edge_ends);
+    // sort the ede list and then copy to the other layers
+    Edge_tim_sort( graph->edge[0], graph->E[0]);
+    for( layer= 1; layer< graph->L; layer++){
+        memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
+    }
+    time_print( "generation time cost[ ", gettimenow() - t0, " ]\n");
 }
