@@ -4,6 +4,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include "pcg_basic.h"
 
 #define SORT_NAME Edge
 #define SORT_TYPE Edge
@@ -65,7 +66,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         dump_graph(graph);
         dump_status(sts);
     }
-    srand((unsigned int)sts->random_seed);
+    pcg32_srandom((unsigned int)sts->random_seed, (unsigned int)sts->random_seed);
     //start timer
     timer0= gettimenow();
 
@@ -138,7 +139,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         for( i= graph->_s; i< graph->_e; i++){
             heap.reaction[i].n= i;
             if( p_raw_rat_lst[i]> FLT_EPSILON){
-                heap.reaction[i].t= - log(rand()/(double)(RAND_MAX))/(p_raw_rat_lst[i]);
+                heap.reaction[i].t= - log(ldexp(pcg32_random(), -32))/(p_raw_rat_lst[i]);
             }
             else{
                 heap.reaction[i].t= DBL_MAX;
@@ -203,7 +204,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                 tmp_double+= tran->edge_trn[layer][evt.nj][sts->M+ sts->_s]* p_inducer_cal_lst[layer][evt.ns];
             }
             if( tmp_double> FLT_EPSILON){
-                reaction.t= - log(rand()/(double)(RAND_MAX))/(tmp_double)+ elapse_tim;
+                reaction.t= - log(ldexp(pcg32_random(), -32))/(tmp_double)+ elapse_tim;
             }
             else{
                 reaction.t= DBL_MAX;
@@ -373,7 +374,7 @@ size_t weighed_rat_rand(double* rat_lst, size_t len){
     }
     left= 0;
     right= len - 1;
-    key= (rand()/(double)RAND_MAX)*tmp_rat_sum[right];
+    key= (ldexp(pcg32_random(), -32))*tmp_rat_sum[right];
 
     //binary search target section
     while(1){
@@ -448,7 +449,7 @@ int get_next_evt(double* p_raw_rat_lst, double** p_inducer_cal_lst, Graph* graph
             edgeb_rat_ttl+= edgeb_tmp_rat_lst[layer* (sts->M)+ j];
         }
     }
-    if(rand()/(double)(RAND_MAX)< nodal_rat_ttl/(nodal_rat_ttl+ edgeb_rat_ttl)){
+    if(ldexp(pcg32_random(), -32)< nodal_rat_ttl/(nodal_rat_ttl+ edgeb_rat_ttl)){
         //nodal
         i= weighed_rat_rand(nodal_tmp_rat_lst+ sts->_s, sts->M);
     }
@@ -735,7 +736,7 @@ void heap_update( Heap* heap, Reaction *reaction){
 */
 double cal_new_tau(double r_old, double r_new, double t_old, double t){
     if( r_new< FLT_EPSILON) return DBL_MAX;
-    if( r_old< FLT_EPSILON) return (- log(rand()/(double)(RAND_MAX))/(r_new)+ t);
+    if( r_old< FLT_EPSILON) return (- log(ldexp(pcg32_random(), -32))/(r_new)+ t);
     return (r_old/r_new)*(t_old- t)+ t;
 }
 double get_tau( Heap* heap, NINT n){
