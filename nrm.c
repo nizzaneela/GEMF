@@ -211,14 +211,8 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                         (evt.ni == 6 && evt.nj == 7)
                     )
                 ){
-                    fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
-                    for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
-                        fprintf( fil_out, " %d", sts->init_cnt[compartment]);
-                    }
-                    if(run->show_inducer){
-                        print_inducer( graph, tran, sts, &evt, fil_out);
-                    }
-                    fprintf( fil_out, "\n");
+                    // only write time, node and status change
+                    fprintf( fil_out, "%lf "fmt_n" %zu %zu\n", elapse_tim, evt.ns, evt.ni, evt.nj);
                 }
             }
             else{
