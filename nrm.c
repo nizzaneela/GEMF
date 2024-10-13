@@ -36,10 +36,11 @@ double cal_new_tau(double r_old, double r_new, double t_old, double t);
 double get_tau( Heap* heap, NINT n);
 void heap_update( Heap* heap, Reaction *reaction);
 void dump_heap( Heap* heap);
-void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_out);
+void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_tra, double elapse_tim, double* p_raw_rat_lst);
 void generate_graph(Graph* graph);
 int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
+    FILE* fil_tra;
     size_t j, layer, compartment, section;
     size_t count= 0;
     int k, primary_case;
@@ -122,6 +123,14 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         return -1;
     }
 
+
+    //open transmission network file and add first infection
+    fil_tra = fopen( "transmission_network.txt", "w");
+    if( fil_tra== NULL){
+        printf("open transmission network file[%s] failed\n", "transmission_network.txt");
+        return -1;
+    }
+    fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
     // ***********************events happen***************************************
     if( run->sim_rounds> 1){
         //save initial status
@@ -214,6 +223,10 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                     // only write time, node and status change
                     fprintf( fil_out, "%lf "fmt_n" %zu %zu\n", elapse_tim, evt.ns, evt.ni, evt.nj);
                 }
+                if( sts->subsample_lst[evt.ns]==1 && evt.ni == 0){
+                    print_inducer( graph, tran, sts, &evt, fil_tra, elapse_tim, p_raw_rat_lst);
+                }
+
             }
             else{
                 //calculate intervals
@@ -363,6 +376,15 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             printf("open output file[%s] faild\n", run->out_file);
             return -1;
         }
+        // close transmission network file and open a new one
+        fclose( fil_tra);
+        fil_tra = fopen( "transmission_network.txt", "w");
+        if( fil_tra== NULL){
+            printf("open transmission network file[%s] failed\n", "transmission_network.txt");
+            return -1;
+        }
+        // write the new first line of the new file
+        fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
         // Olde code for rerunning with the same intitial conditions
         //restore original status and run again
         // R= restore.R;
@@ -437,6 +459,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     }
 
     fclose( fil_out);
+    fclose( fil_tra);
     LOG(1, __FILE__, __LINE__, "End clean up\n");
     return 0;
 }
@@ -836,44 +859,63 @@ void dump_heap( Heap* heap){
     printf("end dump heap\n");
     fflush(stdout);
 }
-void print_inducer( Graph* graph, Transition* tran, Status* sts, Event* evt, FILE* fil_out){
-    fprintf( fil_out, " [");
-    if( tran->nodal_trn[evt->ni][evt->nj]> 0){
-        fprintf( fil_out, "%d", evt->ns);
-    }
-    for( int layer= 0; layer< graph->L; layer++){
-        fprintf( fil_out, "],[");
-        if( tran->edge_trn[layer][evt->ni][evt->nj]> 0){
-            int flag= 0;
-            if( graph->weighted){
-                for( int i= graph->index[layer][evt->ns]; i< graph->index[layer][evt->ns+1]; i++){
-                    if( sts->init_lst[graph->edge_w[layer][i].j] == tran->inducer_lst[layer]){
-                        if( flag){
-                            fprintf( fil_out, ",");
-                        }
-                        else{
-                            flag= 1;
-                        }
-                        fprintf( fil_out, "%d", graph->edge_w[layer][i].j);
-                    }
-                }
-            }
-            else{
-                for( int i= graph->index[layer][evt->ns]; i< graph->index[layer][evt->ns+1]; i++){
-                    if( sts->init_lst[graph->edge[layer][i].j] == tran->inducer_lst[layer]){
-                        if( flag){
-                            fprintf( fil_out, ",");
-                        }
-                        else{
-                            flag= 1;
-                        }
-                        fprintf( fil_out, "%d", graph->edge[layer][i].j);
-                    }
-                }
+void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_tra, double elapse_tim, double* p_raw_rat_lst){
+    int weighted_rate_sum = 0;
+    int random_index;
+    // if the node's rate is less than double the lowest edge rate, we have one inducer'
+    if( p_raw_rat_lst[evt->ns] < (1.9*tran->edge_trn[0][0][1])){
+        // got through each edge of the newly infected node
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is an inducer, that is it
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                return;
             }
         }
     }
-    fprintf( fil_out, "]");
+    else{
+        // got through each edge of the newly infected node
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is 2 or 5, increment rates by 11, 3 or 4 by 20
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                weighted_rate_sum += 11;
+            }
+            else if( sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4){
+                weighted_rate_sum += 20;
+            }
+
+        }
+        // get a random integer up to the rates total
+        random_index = pcg32_boundedrand(weighted_rate_sum);
+        // reset rates, go through again until rates reaches the index
+        weighted_rate_sum = 0;
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is 2 or 5, increment rates by 11, 3 or 4 by 20
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                weighted_rate_sum += 11;
+                if( weighted_rate_sum > random_index){
+                    fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                    return;
+                }
+            }
+            else if( sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4){
+                weighted_rate_sum += 20;
+                if( weighted_rate_sum > random_index){
+                    fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                    return;
+                }
+            }
+
+        }
+
+    }
 }
 
 void generate_graph(Graph* graph){
