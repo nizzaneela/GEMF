@@ -79,15 +79,20 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     //generate and sort graph
     generate_graph(graph);
 
-    // set all nodes to susceptible
+    // set all nodes to susceptible and out of subsample
     for( i= graph->_s; i< graph->_e; i++){
         if( sts->init_lst[i]){
             sts->init_lst[i] = 0;
+        }
+        if( sts->subsample_lst[i]){
+            sts->subsample_lst[i] = 0;
         }
     }
     // set a new primary case (at compartment 2, as in Pekar)
     primary_case = pcg32_boundedrand(graph->_e);
     sts->init_lst[primary_case] = 2;
+    // flag it as part of the subsample
+    sts->subsample_lst[primary_case] = 1;
     // set compartment populations
     sts->init_cnt[0] = 4999999;
     sts->init_cnt[1] = 0;
@@ -183,19 +188,26 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             get_next_evt(p_raw_rat_lst, p_inducer_cal_lst, graph, tran, sts, &evt, &heap);
             count++;
             sts->init_lst[evt.ns]= evt.nj;
+            // track subsample
+            if( (sts->init_cnt[0]>4950000) && (evt.ni==0)){
+                sts->subsample_lst[evt.ns] = 1;
+            }
             LOG(2, __FILE__, __LINE__, "event[%d], time[%.4g]\n", count, elapse_tim);
             //if run only once, output events details, else calculate intervals
             if( run->sim_rounds<=1){
                 sts->init_cnt[evt.ni] --;
                 sts->init_cnt[evt.nj] ++;
-                fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
-                for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
-                    fprintf( fil_out, " %d", sts->init_cnt[compartment]);
+                // Only print subsample
+                if( sts->subsample_lst[evt.ns]==1){
+                    fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
+                    for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
+                        fprintf( fil_out, " %d", sts->init_cnt[compartment]);
+                    }
+                    if(run->show_inducer){
+                        print_inducer( graph, tran, sts, &evt, fil_out);
+                    }
+                    fprintf( fil_out, "\n");
                 }
-                if(run->show_inducer){
-                    print_inducer( graph, tran, sts, &evt, fil_out);
-                }
-                fprintf( fil_out, "\n");
             }
             else{
                 //calculate intervals
@@ -289,17 +301,71 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             heart_beat(&hb);
         }
         printf("stop simulation round [%zu/%zu]\n", round, run->sim_rounds);
-        if(++round> run->sim_rounds){
+        // stop if the simulation was successful (at least 400 total infections and one active infection at end)
+        if(++round> run->sim_rounds &&
+                    (sts->init_cnt[0] <= 4999600 &&
+                        (sts->init_cnt[1] ||
+                            sts->init_cnt[2] ||
+                            sts->init_cnt[3] ||
+                            sts->init_cnt[4] ||
+                            sts->init_cnt[5] ||
+                            sts->init_cnt[6]
+                        )
+                    )
+            ){
             break;
         }
-        //restore original status and run again
-        R= restore.R;
-        memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
-        memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
-        for(layer= 0; layer< graph->L; layer++){
-            memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // otherwise, reset and try again
+        // reset all nodes to susceptible and out of subsample
+        for( i= graph->_s; i< graph->_e; i++){
+            if( sts->init_lst[i]){
+                sts->init_lst[i] = 0;
+            }
+            if( sts->subsample_lst[i]){
+                sts->subsample_lst[i] = 0;
+            }
         }
-        LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
+        // set a new primary case (to 2, as in Pekar)
+        primary_case = (int)pcg32_boundedrand(graph->_e);
+        sts->init_lst[primary_case] = 2;
+        // flag it as part of the subsample
+        sts->subsample_lst[primary_case] = 1;
+        // set compartment populations
+        sts->init_cnt[0] = 4999999;
+        sts->init_cnt[1] = 0;
+        sts->init_cnt[2] = 1;
+        for( compartment= 3; compartment< sts->M+ sts->_s; compartment++){
+            sts->init_cnt[compartment] = 0;
+        }
+        // regenerate graph
+        generate_graph(graph);
+        //re init adjacency index list
+        init_index(graph);
+        // free rate and inducer lists
+        for( layer= 0; layer< graph->L; layer++){
+            free( p_inducer_cal_lst[layer]);
+        }
+        free( p_inducer_cal_lst);
+        free( p_raw_rat_lst);
+        // intialise new rate and inducer lists
+        p_inducer_cal_lst=  init_inducer( graph, sts, tran);
+        R= get_rat_lst( graph, tran, sts, &p_raw_rat_lst, p_inducer_cal_lst);
+        // close output and open a new one
+        fclose( fil_out);
+        fil_out= fopen( run->out_file, "w");
+        if( fil_out== NULL){
+            printf("open output file[%s] faild\n", run->out_file);
+            return -1;
+        }
+        // Olde code for rerunning with the same intitial conditions
+        //restore original status and run again
+        // R= restore.R;
+        // memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
+        // memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
+        // for(layer= 0; layer< graph->L; layer++){
+        //     memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // }
+        // LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
     }
     //post population
     if( run->sim_rounds<=1){

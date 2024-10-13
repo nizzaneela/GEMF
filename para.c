@@ -289,6 +289,7 @@ int initial_con(FILE* fil_sts, Graph* graph, Status* sts){
     NINT count, max_compartment, ni;
     LINE ch;
     sts->init_lst= (size_t*)malloc(sizeof(size_t)*graph->_e);
+    sts->subsample_lst= (size_t*)malloc(sizeof(size_t)*graph->_e);
     sts->init_cnt= (NINT*)malloc(sizeof(NINT)*(sts->_s+sts->M));
 
     // line_num= 0;

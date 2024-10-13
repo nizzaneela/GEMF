@@ -86,6 +86,8 @@ typedef struct
     NINT _node_e;
     //1 by _node_e list, initial status for each node
     size_t *init_lst;
+    //1 by _node_e list, flag if subsample
+    size_t *subsample_lst;
     //1 by (_s+M) array
     //the population of each compartment
     NINT *init_cnt;

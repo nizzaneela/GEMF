@@ -212,6 +212,9 @@ void del_status(Status* sts){
     if( sts->init_cnt!= NULL){
         free( sts->init_cnt);
     }
+    if( sts->subsample_lst!= NULL){
+        free( sts->subsample_lst);
+    }
 }
 void del_run(Run* run){
     if( run->out_file!= NULL) free (run->out_file);
