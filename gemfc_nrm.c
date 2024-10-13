@@ -324,25 +324,25 @@ void initi_status(FILE* fil_para, Graph* graph, Status* sts, int echo){
     char *fil_nam= NULL;
     FILE* fil_sts= NULL;
     size_t i;
-
-    //read in status file
-    LOG(2, __FILE__, __LINE__, "Read in status file\n");
-    fil_nam= getValStr( fil_para, "[STATUS_FILE]", MAX_LINE_LEN, echo);
-    fil_sts= fopen( fil_nam, "r");
-    if( fil_sts== NULL){
-        printf("Read file[%s] error\n", fil_nam);
-        exit( -1);
-    }
+    //
+    // //read in status file
+    // LOG(2, __FILE__, __LINE__, "Read in status file\n");
+    // fil_nam= getValStr( fil_para, "[STATUS_FILE]", MAX_LINE_LEN, echo);
+    // fil_sts= fopen( fil_nam, "r");
+    // if( fil_sts== NULL){
+    //     printf("Read file[%s] error\n", fil_nam);
+    //     exit( -1);
+    // }
     if( initial_con( fil_sts, graph, sts)< 0){
         printf("initial status failed\n");
         exit(-1);
     }
-    printf("[initial population]\t[");
-    for( i= sts->_s; i< sts->M+ sts->_s; i++){
-        kilobit_print(" ", (LONG)sts->init_cnt[i], " ");
-    }
-    printf("]\n");
-    fclose(fil_sts);
+    // printf("[initial population]\t[");
+    // for( i= sts->_s; i< sts->M+ sts->_s; i++){
+    //     kilobit_print(" ", (LONG)sts->init_cnt[i], " ");
+    // }
+    // printf("]\n");
+    // fclose(fil_sts);
     LOG(2, __FILE__, __LINE__, "Read in status file success\n");
     if( fil_nam!= NULL) free (fil_nam);
 }

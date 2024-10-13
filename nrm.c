@@ -42,7 +42,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
     size_t j, layer, compartment, section;
     size_t count= 0;
-    int k;
+    int k, primary_case;
     NINT beg_num, end_num, cur_nod, i;
     int** p_nsim_avg_lst= NULL;
     //double T= 0.0;
@@ -78,6 +78,28 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     heap.V= 0;
     //generate and sort graph
     generate_graph(graph);
+
+    // set all nodes to susceptible
+    for( i= graph->_s; i< graph->_e; i++){
+        if( sts->init_lst[i]){
+            sts->init_lst[i] = 0;
+        }
+    }
+    // set a new primary case (at compartment 2, as in Pekar)
+    primary_case = pcg32_boundedrand(graph->_e);
+    sts->init_lst[primary_case] = 2;
+    // set compartment populations
+    sts->init_cnt[0] = 4999999;
+    sts->init_cnt[1] = 0;
+    sts->init_cnt[2] = 1;
+    for( compartment= 3; compartment< sts->M+ sts->_s; compartment++){
+        sts->init_cnt[compartment] = 0;
+    }
+    printf("[initial population]\t[");
+    for( i= sts->_s; i< sts->M+ sts->_s; i++){
+        kilobit_print(" ", (LONG)sts->init_cnt[i], " ");
+    }
+    printf("]\n");
 
     //init inducer list
     p_inducer_cal_lst=  init_inducer( graph, sts, tran);
