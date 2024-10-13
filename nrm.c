@@ -198,7 +198,19 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                 sts->init_cnt[evt.ni] --;
                 sts->init_cnt[evt.nj] ++;
                 // Only print subsample
-                if( sts->subsample_lst[evt.ns]==1){
+                if( sts->subsample_lst[evt.ns]==1 &&
+                    // and only if relevant to sampling, i.e. primary case
+                    (evt.ns == primary_case ||
+                        // ascertainment events
+                        evt.nj == 3 ||
+                        // recoveries of ascertained cases
+                        (evt.ni == 3 && evt.nj == 7) ||
+                        // hospitalizations
+                        evt.nj == 6 ||
+                        // recoveries of hospitalized cases
+                        (evt.ni == 6 && evt.nj == 7)
+                    )
+                ){
                     fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
                     for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
                         fprintf( fil_out, " %d", sts->init_cnt[compartment]);
