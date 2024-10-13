@@ -41,6 +41,7 @@ void generate_graph(Graph* graph);
 int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
     FILE* fil_tra;
+    FILE *fil_fai;
     size_t j, layer, compartment, section;
     size_t count= 0;
     int k, primary_case;
@@ -460,6 +461,14 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
 
     fclose( fil_out);
     fclose( fil_tra);
+    // Write failures
+    fil_fai = fopen("failures.txt", "w");
+    if (fil_fai == NULL) {
+        printf("Error opening file for recording failures!\n");
+        return 1;
+    }
+    fprintf(fil_fai, "%ld failures before success", round -2);
+    fclose(fil_fai);
     LOG(1, __FILE__, __LINE__, "End clean up\n");
     return 0;
 }
