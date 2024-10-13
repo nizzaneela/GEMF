@@ -928,7 +928,6 @@ void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FIL
 }
 
 void generate_graph(Graph* graph){
-    printf("Generating network...\n");
 
     const int m = 8;         // Initial number of nodes
     const int n = 5000000;    // Total number of nodes to be generated
@@ -936,7 +935,6 @@ void generate_graph(Graph* graph){
     int new_nodes_edge_targets[m];
     int *edge_ends = malloc((m + 2 * m * (n - m)) * sizeof(int));
     size_t layer;
-    double t0 = gettimenow();
 
     if (edge_ends == NULL) {
         perror("Error allocating memory");
@@ -984,5 +982,4 @@ void generate_graph(Graph* graph){
     for( layer= 1; layer< graph->L; layer++){
         memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
     }
-    time_print( "generation time cost[ ", gettimenow() - t0, " ]\n");
 }
