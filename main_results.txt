@@ -1,0 +1,9 @@
+Parameter file: main.txt
+Seed: 3814942705
+Successful epidemics: 110000
+Failure rate: 0.7835272076780931
+Basal polytomy rate: 0.47646363636363637
+AB topology rate: 0.0387
+CC topology rate: 0.0018636363636363635
+unconstrained Bayes factor: 3.3107898146482304
+recCA Bayes factor: 3.3932459810612197
