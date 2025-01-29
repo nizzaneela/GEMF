@@ -1,17 +1,6 @@
 The original GEMF implementation in C was developed by Futing Fan, [Copyright (c) 2016](LICENSE). It has since been updated by [Niema Moshiri](https://niema.net/).
 
-This version is further modified to efficiently and deterministically replicate the analysis of [The molecular epidemiology of multiple zoonotic origins of SARS-CoV-2](https://www.science.org/doi/10.1126/science.abp8337
-
-            
-            
-
-              
-                25 comments on PubPeer (by: Neoacanthoparyphium Echinatoides, Michael B. Weissman, Rubeotermes Jheringi, Aspergillus Australensis, Nebrioporus Baeticus, Guatteria Galeottiana, Diradops Nishidai, Poecilimon Heroicus)
-              
-            
-
-          
-). The only corrections to the single intro model are the starting the primary case as exposed and omitting the pruning of  short lived basal lineage with the stable coalescence. Two intro model draws pairs of single intro epidemics, offsets all events in each by t0 and t1, respectively, combines them with an MRCA and upstream lineages of length t0 and t1, respectively, and then puts the combined epidemic data through the same pipeline as for the single intro model. It's repeated for t0 and t1 in {0, 5, 10, 15, 20, 25, 30} days. 
+This version is further modified to efficiently and deterministically replicate the analysis of [The molecular epidemiology of multiple zoonotic origins of SARS-CoV-2](https://www.science.org/doi/10.1126/science.abp8337). The only corrections to the single intro model are the starting the primary case as exposed and omitting the pruning of  short lived basal lineage with the stable coalescence. Two intro model draws pairs of single intro epidemics, offsets all events in each by t0 and t1, respectively, combines them with an MRCA and upstream lineages of length t0 and t1, respectively, and then puts the combined epidemic data through the same pipeline as for the single intro model. It's repeated for t0 and t1 in {0, 5, 10, 15, 20, 25, 30} days. 
 
 ## Installation
 
