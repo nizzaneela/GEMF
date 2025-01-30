@@ -19,8 +19,13 @@ This repository should then be cloned, and the `GEMF` tool compiled and installe
 ```bash
 git clone --branch replication https://github.com/nizzaneela/GEMF.git
 cd GEMF
-sudo mv GEMF /usr/local/bin/
 make
+sudo mv GEMF /usr/local/bin/
+```
+
+The scripts need `numpy` version 1.19 or later, and [treeswift](https://github.com/niemasd/TreeSwift), e.g.:
+```bash
+sudo pip install treeswift
 ```
 
 The analysis can then be reproduced with python script `replicate.py`. It takes one argument: the number of processes to run in parallel, e.g.:
