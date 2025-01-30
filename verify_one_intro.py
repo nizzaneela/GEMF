@@ -24,7 +24,7 @@ def main():
     # Reproduce replicate's SeedSequence list
     seed = 42
     one_intro_seedseq, two_intro_seedseq = np.random.SeedSequence(seed).spawn(2)
-    seedseq_list = np.random.SeedSequence(one_intro_seedseq).spawn(NUM_SIMS)
+    seedseq_list = one_intro_seedseq.spawn(NUM_SIMS)
 
     # Get the i-th seed from the list
     selected_seedseq = seedseq_list[i]
