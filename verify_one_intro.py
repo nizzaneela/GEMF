@@ -30,7 +30,7 @@ def main():
     selected_seedseq = seedseq_list[i]
 
     # ensure verification directory is cwd
-    verification_dir  = f"{parameters_file_name.split('.')[0]}_verifications"
+    verification_dir  = f"{parameters_file_name.split('_')[0]}_verifications"
     if os.path.basename(os.getcwd()) != verification_dir:
         os.makedirs(verification_dir, exist_ok=True)
         shutil.copy2(parameters_file_name, os.path.join(verification_dir, parameters_file_name))
@@ -42,7 +42,7 @@ def main():
     # Run the single-introduction simulation using the i-th SeedSequence
     one_intro(output_dir, parameters_file_name, selected_seedseq)
 
-    print(f"Verification run {i} completed. Results are in: {os.path.join(verification_dir, "one_intro", str(i))}")
+    print(f"Verification run {i} completed. Results are in: {os.path.join(verification_dir, 'one_intro', str(i))}")
 
 
 if __name__ == "__main__":
