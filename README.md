@@ -37,9 +37,9 @@ Each process needs about 3.5Gb RAM.
 
 The code generates 110,000 simulated epidemics, from which it draws 110,000 pairs of epidemics, and subjects the simulated epidemics and the pairs of simulated epidemics to the same analysis. The results are stored in `one_intro/n` and `two_intro/n`, where n is 0 to 109,999.
 
-Results for any particular simulated epidemic n in the sample 0 to 109,999 can be verified with `verify_one_intro.py $n$`.
+Results for any particular simulated epidemic n in the sample 0 to 109,999 can be verified with `verify_one_intro.py main_parameters.txt $n$`.
 
-Results for any particular pair of simulated epidemics n in the sample 0 to 109,999 can be verified with `verify_two_intro.py $n$`.
+Results for any particular pair of simulated epidemics n in the sample 0 to 109,999 can be verified with `verify_two_intro.py main_parameters.txt $n$`.
 
 The final stochastic product of each simulation and pair of simulations is hashed to `tree_final_hash.txt`, which can be used for verification. E.g., if you want to verify each of the reported CC topologies, search the `one_intro` directory to find the numbers n of the simulations where the content of `CC.txt` is non-zero (there's probably about 300), and then run `verify_one_intro.py n` for each n, and compare the hashes. The idea is to provide verifiable output in a small list of hashes, rather than terabytes of data. Please let me know if you have a better idea for doing this. 
 
