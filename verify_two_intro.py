@@ -39,7 +39,7 @@ def main():
     rng = np.random.default_rng(two_intro_seedseq_list[i])
 
     # Create or switch to a verification directory
-    verification_dir  = f"{os.path.splitext(parameters_file_name)[0]}_verifications"
+    verification_dir  = f"{parameters_file_name.split('_')[0]}_verifications"
     if os.path.basename(os.getcwd()) != verification_dir:
         os.makedirs(verification_dir, exist_ok=True)
         # Optionally copy the parameters file for reference
