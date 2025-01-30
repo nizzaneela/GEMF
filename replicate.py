@@ -43,7 +43,7 @@ def main(parameters_file_name: str, num_processors: int):
     for i in range(NUM_SIMS):
         directory_list.append(os.path.join("one_intro", str(i)))
         parameter_list.append(parameters_file_name)
-    seedseq_list = np.random.SeedSequence(one_intro_seedseq).spawn(NUM_SIMS)
+    seedseq_list = one_intro_seedseq.spawn(NUM_SIMS)
     # run workers - one for each successful introduction and its analysis
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_processors) as executor:
         futures = []
@@ -58,7 +58,7 @@ def main(parameters_file_name: str, num_processors: int):
     rng_list = []
     intro_0_list = []
     intro_1_list = []
-    for i, seq in enumerate(np.random.SeedSequence(two_intro_seedseq).spawn(NUM_SIMS)):
+    for i, seq in enumerate(two_intro_seedseq.spawn(NUM_SIMS)):
         directory_list.append(os.path.join("two_intro", str(i)))
         parameter_list.append(parameters_file_name)
         rng = np.random.default_rng(seq)
@@ -97,6 +97,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     parameters_file_name = 'main_parameters.txt'
-    num_processors = int(sys.argv[2])
+    num_processors = int(sys.argv[1])
 
     main(parameters_file_name, num_processors)
