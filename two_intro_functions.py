@@ -171,8 +171,9 @@ def two_intro(output_dir, parameters_file_name, rng, id_0, id_1):
     transmission_network_1, disease_events_1 = get_sim_data(id_1, "_1")
 
     # analyse possible combinations of times t0, t1 between MRCA and introductions 1, 2
-    AB_array = np.zeros((len(TMRCA_TO_INTRO_VALUES), len(TMRCA_TO_INTRO_VALUES)))
-    CC_array = np.zeros((len(TMRCA_TO_INTRO_VALUES), len(TMRCA_TO_INTRO_VALUES)))
+    # Create integer arrays for AB and CC
+    AB_array = np.zeros((len(TMRCA_TO_INTRO_VALUES), len(TMRCA_TO_INTRO_VALUES)),dtype=int)
+    CC_array = np.zeros((len(TMRCA_TO_INTRO_VALUES), len(TMRCA_TO_INTRO_VALUES)),dtype=int)
     for i0, t0 in enumerate(TMRCA_TO_INTRO_VALUES):
         for i1, t1 in enumerate(TMRCA_TO_INTRO_VALUES):
             offset_0 = t0/365 # convert to years
@@ -196,11 +197,11 @@ def two_intro(output_dir, parameters_file_name, rng, id_0, id_1):
 
     # Write AB to file
     ab_path = os.path.join(output_dir, 'AB_array.csv')
-    np.savetxt(ab_path, AB_array, delimiter=",")
+    np.savetxt(ab_path, AB_array, delimiter=",", fmt='%d')
 
     # Write CC to file
     cc_path = os.path.join(output_dir, 'CC_array.csv')
-    np.savetxt(cc_path, CC_array, delimiter=",")
+    np.savetxt(cc_path, CC_array, delimiter=",", fmt='%d')
 
     # store the final tree
     tree.write_tree_newick(os.path.join(output_dir, "final_tree.nwk"))
