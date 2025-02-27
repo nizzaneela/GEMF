@@ -291,110 +291,110 @@ int initial_con(FILE* fil_sts, Graph* graph, Status* sts){
     sts->init_lst= (size_t*)malloc(sizeof(size_t)*graph->_e);
     sts->init_cnt= (NINT*)malloc(sizeof(NINT)*(sts->_s+sts->M));
 
-    line_num= 0;
-    while( fgetline( fil_sts, ch, MAX_LINE_LEN)) line_num++;
-    if( line_num== graph->V){
-        //MODE 1.
-        LOG(2, __FILE__, __LINE__, "Status file mode [1]\n");
-        rewind( fil_sts);
-        for (li= graph->_s; li< graph->_e; li++) {
-            if( fscanf(fil_sts,"%zu", sts->init_lst+li)<= 0){
-                printf("fatal error, missing initial status for node [%zu] and all above\n", li);
-                return -1;
-            }
-            sts->init_cnt[*(sts->init_lst+li)]++;
-        }
-    }
-    else if( line_num== 1){
-        //MODE 2.
-        LOG(2, __FILE__, __LINE__, "Status file mode [2]\n");
-        srand((unsigned int)sts->random_seed);
-        k= 0;
-        count= 0;
-        rewind( fil_sts);
-        for( li= sts->_s; li< sts->M+ sts->_s; li++){
-            if( fscanf( fil_sts, "%d", &val)> 0){
-                if( val< 0){
-                    k++;
-                    dynamic= li;
-                }
-                else{
-                    count+= (NINT)val;
-                }
-                sts->init_cnt[li]= (NINT)val;
-            }
-            else{
-                for(; li< sts->M+ sts->_s; li++){
-                    count+= (NINT)val;
-                    sts->init_cnt[li]= (NINT)val;
-                }
-                break;
-            }
-        }
-        if( k> 1){
-            printf("Fatal error! wrong status config, only one or less compartment can be dynamic(negative)\n");
-            exit( - 1);
-        }
-        else if( count> graph->V){
-            printf("Fatal error! wrong status config, configure exceed node number\n");
-            exit( - 1);
-        }
-        else if( k==0 && count< graph->V){
-            printf("Fatal error! wrong status config, if total number is uncertain, spcify one compartment as -1\n");
-            exit( - 1);
-        }
-        else if( k== 1){
-            sts->init_cnt[dynamic]= graph->V - count;
-        }
-        //find max compartment
-        max_compartment= 0;
-        for( li=sts->_s; li< sts->M+ sts->_s; li++){
-            if( sts->init_cnt[li]> max_compartment){
-                max_compartment= sts->init_cnt[li];
-                max_compartmet_value= li;
-            }
-        }
-        for( li= graph->_s; li< graph->_e; li++){
-            sts->init_lst[li]= max_compartmet_value;
-        }
-        for( li=sts->_s; li< sts->M+ sts->_s; li++){
-            if( li!= max_compartmet_value){
-                for( j= 0; j< sts->init_cnt[li];){
-                    lj= (size_t)((rand()/(double)RAND_MAX)*graph->V);
-                    if( sts->init_lst[lj]!= max_compartmet_value) continue;
-                    sts->init_lst[graph->_s+ lj%graph->V]= li;
-                    j++;
-                }
-            }
-        }
-    }
-    else{
-        //MODE 3.
-        LOG(2, __FILE__, __LINE__, "Status file mode [3]\n");
-        rewind( fil_sts);
-        fscanf( fil_sts, "%s", ch);
-        if( strcmp(ch, "default")){
-            printf(" check status file, read manual\n");
-            exit( - 1);
-        }
-        rewind( fil_sts);
-        if( fcolumn_count( fil_sts)!= 2){
-            printf(" check status file, read manual\n");
-            exit( - 1);
-        }
-        rewind( fil_sts);
-        fscanf( fil_sts, "%s %zu", ch, &max_compartmet_value);
-        for( li= graph->_s; li< graph->_e; li++){
-            sts->init_lst[li]= max_compartmet_value;
-        }
-        sts->init_cnt[max_compartmet_value]= graph->V;
-        for( li= 0; li< line_num - 1; li++){
-            fscanf( fil_sts, "%d %zu", &ni, &ns);
-            sts->init_lst[ni]= ns;
-            sts->init_cnt[ns]++;
-            sts->init_cnt[max_compartmet_value] --;
-        }
-    }
+    // line_num= 0;
+    // while( fgetline( fil_sts, ch, MAX_LINE_LEN)) line_num++;
+    // if( line_num== graph->V){
+    //     //MODE 1.
+    //     LOG(2, __FILE__, __LINE__, "Status file mode [1]\n");
+    //     rewind( fil_sts);
+    //     for (li= graph->_s; li< graph->_e; li++) {
+    //         if( fscanf(fil_sts,"%zu", sts->init_lst+li)<= 0){
+    //             printf("fatal error, missing initial status for node [%zu] and all above\n", li);
+    //             return -1;
+    //         }
+    //         sts->init_cnt[*(sts->init_lst+li)]++;
+    //     }
+    // }
+    // else if( line_num== 1){
+    //     //MODE 2.
+    //     LOG(2, __FILE__, __LINE__, "Status file mode [2]\n");
+    //     srand((unsigned int)sts->random_seed);
+    //     k= 0;
+    //     count= 0;
+    //     rewind( fil_sts);
+    //     for( li= sts->_s; li< sts->M+ sts->_s; li++){
+    //         if( fscanf( fil_sts, "%d", &val)> 0){
+    //             if( val< 0){
+    //                 k++;
+    //                 dynamic= li;
+    //             }
+    //             else{
+    //                 count+= (NINT)val;
+    //             }
+    //             sts->init_cnt[li]= (NINT)val;
+    //         }
+    //         else{
+    //             for(; li< sts->M+ sts->_s; li++){
+    //                 count+= (NINT)val;
+    //                 sts->init_cnt[li]= (NINT)val;
+    //             }
+    //             break;
+    //         }
+    //     }
+    //     if( k> 1){
+    //         printf("Fatal error! wrong status config, only one or less compartment can be dynamic(negative)\n");
+    //         exit( - 1);
+    //     }
+    //     else if( count> graph->V){
+    //         printf("Fatal error! wrong status config, configure exceed node number\n");
+    //         exit( - 1);
+    //     }
+    //     else if( k==0 && count< graph->V){
+    //         printf("Fatal error! wrong status config, if total number is uncertain, spcify one compartment as -1\n");
+    //         exit( - 1);
+    //     }
+    //     else if( k== 1){
+    //         sts->init_cnt[dynamic]= graph->V - count;
+    //     }
+    //     //find max compartment
+    //     max_compartment= 0;
+    //     for( li=sts->_s; li< sts->M+ sts->_s; li++){
+    //         if( sts->init_cnt[li]> max_compartment){
+    //             max_compartment= sts->init_cnt[li];
+    //             max_compartmet_value= li;
+    //         }
+    //     }
+    //     for( li= graph->_s; li< graph->_e; li++){
+    //         sts->init_lst[li]= max_compartmet_value;
+    //     }
+    //     for( li=sts->_s; li< sts->M+ sts->_s; li++){
+    //         if( li!= max_compartmet_value){
+    //             for( j= 0; j< sts->init_cnt[li];){
+    //                 lj= (size_t)((rand()/(double)RAND_MAX)*graph->V);
+    //                 if( sts->init_lst[lj]!= max_compartmet_value) continue;
+    //                 sts->init_lst[graph->_s+ lj%graph->V]= li;
+    //                 j++;
+    //             }
+    //         }
+    //     }
+    // }
+    // else{
+    //     //MODE 3.
+    //     LOG(2, __FILE__, __LINE__, "Status file mode [3]\n");
+    //     rewind( fil_sts);
+    //     fscanf( fil_sts, "%s", ch);
+    //     if( strcmp(ch, "default")){
+    //         printf(" check status file, read manual\n");
+    //         exit( - 1);
+    //     }
+    //     rewind( fil_sts);
+    //     if( fcolumn_count( fil_sts)!= 2){
+    //         printf(" check status file, read manual\n");
+    //         exit( - 1);
+    //     }
+    //     rewind( fil_sts);
+    //     fscanf( fil_sts, "%s %zu", ch, &max_compartmet_value);
+    //     for( li= graph->_s; li< graph->_e; li++){
+    //         sts->init_lst[li]= max_compartmet_value;
+    //     }
+    //     sts->init_cnt[max_compartmet_value]= graph->V;
+    //     for( li= 0; li< line_num - 1; li++){
+    //         fscanf( fil_sts, "%d %zu", &ni, &ns);
+    //         sts->init_lst[ni]= ns;
+    //         sts->init_cnt[ns]++;
+    //         sts->init_cnt[max_compartmet_value] --;
+    //     }
+    // }
    return (int)line_num;
 }
 /*

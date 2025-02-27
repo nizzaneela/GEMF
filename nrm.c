@@ -4,7 +4,12 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include "pcg_basic.h"
 
+#define SORT_NAME Edge
+#define SORT_TYPE Edge
+#define SORT_CMP(x, y)  ((x).i < (y).i ? -1 : ((y).i < (x).i ? 1 : 0))
+#include "sort.h"
 
 /*
  * nrm.c of GEMF in C language
@@ -31,12 +36,15 @@ double cal_new_tau(double r_old, double r_new, double t_old, double t);
 double get_tau( Heap* heap, NINT n);
 void heap_update( Heap* heap, Reaction *reaction);
 void dump_heap( Heap* heap);
-void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_out);
+void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_tra, double elapse_tim, double* p_raw_rat_lst);
+void generate_graph(Graph* graph);
 int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     FILE* fil_out;
+    FILE* fil_tra;
+    FILE *fil_fai;
     size_t j, layer, compartment, section;
     size_t count= 0;
-    int k;
+    int k, primary_case;
     NINT beg_num, end_num, cur_nod, i;
     int** p_nsim_avg_lst= NULL;
     //double T= 0.0;
@@ -61,7 +69,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         dump_graph(graph);
         dump_status(sts);
     }
-    srand((unsigned int)sts->random_seed);
+    pcg32_srandom((unsigned int)sts->random_seed, (unsigned int)sts->random_seed);
     //start timer
     timer0= gettimenow();
 
@@ -70,17 +78,26 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     heap._s= 0;
     heap._e= 0;
     heap.V= 0;
-    //sort graph
-    if( graph->weighted){
-        for( layer= 0; layer< graph->L; layer++){
-            qsort( graph->edge_w[layer], graph->E[layer], sizeof( Edge_w), Edge_cmp);
-        }
+    //generate and sort graph
+    generate_graph(graph);
+
+    // set all nodes to susceptible
+    memset(sts->init_lst, 0, sts->_node_e * sizeof(sts->init_lst[0]));
+
+    // set a new primary case (at compartment 1, contra in Pekar)
+    primary_case = pcg32_boundedrand(graph->_e);
+    sts->init_lst[primary_case] = 1;
+    // set compartment populations
+    sts->init_cnt[0] = 4999999;
+    sts->init_cnt[1] = 1;
+    for( compartment= 2; compartment< sts->M+ sts->_s; compartment++){
+        sts->init_cnt[compartment] = 0;
     }
-    else{
-        for( layer= 0; layer< graph->L; layer++){
-            qsort( graph->edge[layer], graph->E[layer], sizeof( Edge), Edge_cmp);
-        }
+    printf("[initial population]\t[");
+    for( i= sts->_s; i< sts->M+ sts->_s; i++){
+        kilobit_print(" ", (LONG)sts->init_cnt[i], " ");
     }
+    printf("]\n");
 
     //init inducer list
     p_inducer_cal_lst=  init_inducer( graph, sts, tran);
@@ -98,6 +115,14 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         return -1;
     }
 
+
+    //open transmission network file and add first infection
+    fil_tra = fopen( "transmission_network.txt", "w");
+    if( fil_tra== NULL){
+        printf("open transmission network file[%s] failed\n", "transmission_network.txt");
+        return -1;
+    }
+    fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
     // ***********************events happen***************************************
     if( run->sim_rounds> 1){
         //save initial status
@@ -133,7 +158,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
         for( i= graph->_s; i< graph->_e; i++){
             heap.reaction[i].n= i;
             if( p_raw_rat_lst[i]> FLT_EPSILON){
-                heap.reaction[i].t= - log(rand()/(double)(RAND_MAX))/(p_raw_rat_lst[i]);
+                heap.reaction[i].t= - log(ldexp(pcg32_random(), -32))/(p_raw_rat_lst[i]);
             }
             else{
                 heap.reaction[i].t= DBL_MAX;
@@ -165,18 +190,37 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             count++;
             sts->init_lst[evt.ns]= evt.nj;
             LOG(2, __FILE__, __LINE__, "event[%d], time[%.4g]\n", count, elapse_tim);
+            // check if this is an excess infection attempt
+            if (sts->init_cnt[0] == 4950000 && evt.ni == 0) {
+                // We are at exactly 50k infected so far, so DO NOT apply this infection
+                // Instead, set its time to DBL_MAX and go to the next event
+                reaction.t= DBL_MAX;
+                reaction.n = evt.ns;
+                heap_update(&heap, &reaction);
+                R -= p_raw_rat_lst[evt.ns];
+                p_raw_rat_lst[evt.ns] = 0;
+                continue;  // skip applying the infection
+            }
             //if run only once, output events details, else calculate intervals
             if( run->sim_rounds<=1){
                 sts->init_cnt[evt.ni] --;
                 sts->init_cnt[evt.nj] ++;
-                fprintf( fil_out, "%lf %lf "fmt_n" %zu %zu", elapse_tim, R, evt.ns, evt.ni, evt.nj);
-                for( compartment= sts->_s; compartment< sts->M+ sts->_s; compartment++){
-                    fprintf( fil_out, " %d", sts->init_cnt[compartment]);
+                // To output.txt, write out events relevant to sampling, i.e. ascertainment events
+                if( evt.nj == 3 ||
+                    // recoveries of ascertained cases
+                    (evt.ni == 3 && evt.nj == 7) ||
+                    // hospitalizations
+                    evt.nj == 6 ||
+                    // recoveries of hospitalized cases
+                    (evt.ni == 6 && evt.nj == 7)
+                    ){
+                    // only write time, node and status change
+                    fprintf( fil_out, "%lf "fmt_n" %zu %zu\n", elapse_tim, evt.ns, evt.ni, evt.nj);
                 }
-                if(run->show_inducer){
-                    print_inducer( graph, tran, sts, &evt, fil_out);
+                // To transmission_network.txt, write out transmissions
+                if( evt.ni == 0){
+                    print_inducer( graph, tran, sts, &evt, fil_tra, elapse_tim, p_raw_rat_lst);
                 }
-                fprintf( fil_out, "\n");
             }
             else{
                 //calculate intervals
@@ -198,7 +242,7 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
                 tmp_double+= tran->edge_trn[layer][evt.nj][sts->M+ sts->_s]* p_inducer_cal_lst[layer][evt.ns];
             }
             if( tmp_double> FLT_EPSILON){
-                reaction.t= - log(rand()/(double)(RAND_MAX))/(tmp_double)+ elapse_tim;
+                reaction.t= - log(ldexp(pcg32_random(), -32))/(tmp_double)+ elapse_tim;
             }
             else{
                 reaction.t= DBL_MAX;
@@ -216,6 +260,10 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             printf("after update[%d]\n", __LINE__);
             */
             R= R+ tmp_double - p_raw_rat_lst[evt.ns];
+            // don't bother with neighbours once we have 50k
+            if (sts->init_cnt[0] == 4950000) {
+                continue;
+            }
             p_raw_rat_lst[evt.ns]= tmp_double;
             //2. inducer_neighbour++/--
             for( layer= 0; layer< graph->L; layer++){
@@ -270,17 +318,72 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
             heart_beat(&hb);
         }
         printf("stop simulation round [%zu/%zu]\n", round, run->sim_rounds);
-        if(++round> run->sim_rounds){
+        // stop if the simulation was successful (at least 400 total infections and one active infection at end)
+        if(++round> run->sim_rounds &&
+                (sts->init_cnt[0] <= 4950000 ||
+                    (sts->init_cnt[0] <= 4999600 &&
+                        (sts->init_cnt[1] ||
+                            sts->init_cnt[2] ||
+                            sts->init_cnt[3] ||
+                            sts->init_cnt[4] ||
+                            sts->init_cnt[5] ||
+                            sts->init_cnt[6]
+                        )
+                    )
+                )
+            ){
             break;
         }
-        //restore original status and run again
-        R= restore.R;
-        memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
-        memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
-        for(layer= 0; layer< graph->L; layer++){
-            memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // otherwise, reset and try again
+        // reset all nodes to susceptible
+        memset(sts->init_lst, 0, sts->_node_e * sizeof(sts->init_lst[0]));
+        // set a new primary case (to 1, contra Pekar)
+        primary_case = (int)pcg32_boundedrand(graph->_e);
+        sts->init_lst[primary_case] = 1;
+        // set compartment populations
+        sts->init_cnt[0] = 4999999;
+        sts->init_cnt[1] = 1;
+        for( compartment= 2; compartment< sts->M+ sts->_s; compartment++){
+            sts->init_cnt[compartment] = 0;
         }
-        LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
+        // regenerate graph
+        generate_graph(graph);
+        //re init adjacency index list
+        init_index(graph);
+        // free rate and inducer lists
+        for( layer= 0; layer< graph->L; layer++){
+            free( p_inducer_cal_lst[layer]);
+        }
+        free( p_inducer_cal_lst);
+        free( p_raw_rat_lst);
+        // intialise new rate and inducer lists
+        p_inducer_cal_lst=  init_inducer( graph, sts, tran);
+        R= get_rat_lst( graph, tran, sts, &p_raw_rat_lst, p_inducer_cal_lst);
+        // close output and open a new one
+        fclose( fil_out);
+        fil_out= fopen( run->out_file, "w");
+        if( fil_out== NULL){
+            printf("open output file[%s] faild\n", run->out_file);
+            return -1;
+        }
+        // close transmission network file and open a new one
+        fclose( fil_tra);
+        fil_tra = fopen( "transmission_network.txt", "w");
+        if( fil_tra== NULL){
+            printf("open transmission network file[%s] failed\n", "transmission_network.txt");
+            return -1;
+        }
+        // write the new first line of the new file
+        fprintf(fil_tra, "None\t%d\t0.0\n", primary_case);
+        // Olde code for rerunning with the same intitial conditions
+        //restore original status and run again
+        // R= restore.R;
+        // memcpy( sts->init_lst, restore.init_lst, sizeof(size_t)*(graph->_e));
+        // memcpy( p_raw_rat_lst, restore.p_raw_rat_lst, sizeof(double)*(graph->_e));
+        // for(layer= 0; layer< graph->L; layer++){
+        //     memcpy( p_inducer_cal_lst[layer], restore.p_inducer_cal_lst[layer],  sizeof(double)*(graph->_e));
+        // }
+        // LOG(1, __FILE__, __LINE__, "End simulation round [%zu/%zu]\n", round, run->sim_rounds);
     }
     //post population
     if( run->sim_rounds<=1){
@@ -346,6 +449,15 @@ int nrm(Graph* graph, Transition* tran, Status* sts, Run* run){
     }
 
     fclose( fil_out);
+    fclose( fil_tra);
+    // Write failures
+    fil_fai = fopen("failures.txt", "w");
+    if (fil_fai == NULL) {
+        printf("Error opening file for recording failures!\n");
+        return 1;
+    }
+    fprintf(fil_fai, "%ld failures before success", round -2);
+    fclose(fil_fai);
     LOG(1, __FILE__, __LINE__, "End clean up\n");
     return 0;
 }
@@ -368,7 +480,7 @@ size_t weighed_rat_rand(double* rat_lst, size_t len){
     }
     left= 0;
     right= len - 1;
-    key= (rand()/(double)RAND_MAX)*tmp_rat_sum[right];
+    key= (ldexp(pcg32_random(), -32))*tmp_rat_sum[right];
 
     //binary search target section
     while(1){
@@ -443,7 +555,7 @@ int get_next_evt(double* p_raw_rat_lst, double** p_inducer_cal_lst, Graph* graph
             edgeb_rat_ttl+= edgeb_tmp_rat_lst[layer* (sts->M)+ j];
         }
     }
-    if(rand()/(double)(RAND_MAX)< nodal_rat_ttl/(nodal_rat_ttl+ edgeb_rat_ttl)){
+    if(ldexp(pcg32_random(), -32)< nodal_rat_ttl/(nodal_rat_ttl+ edgeb_rat_ttl)){
         //nodal
         i= weighed_rat_rand(nodal_tmp_rat_lst+ sts->_s, sts->M);
     }
@@ -468,32 +580,6 @@ void* malloc1( size_t l, size_t s){
 double** init_inducer(Graph* graph, Status* sts, Transition* tran){
     LOG(1, __FILE__, __LINE__, " initial inducer\n");
     double** mtx=  malloc2Dbl( graph->L, (size_t)graph->_e);
-    size_t l;
-    size_t li;
-    if( graph->weighted== 1){
-        Edge_w * p_ew;
-        for( l=0; l< graph->L; l++){
-            p_ew= graph->edge_w[l];
-            for( li= 0; li< graph->E[l]; li++){
-                if( sts->init_lst[p_ew->i] == tran->inducer_lst[l]){
-                    mtx[l][p_ew->j]+= p_ew->w;
-                }
-                p_ew++;
-            }
-        }
-    }
-    else{
-        Edge * p_e;
-        for( l=0; l< graph->L; l++){
-            p_e= graph->edge[l];
-            for( li= 0; li< graph->E[l]; li++){
-                if( sts->init_lst[p_e->i] == tran->inducer_lst[l]){
-                    mtx[l][p_e->j]++;
-                }
-                p_e++;
-            }
-        }
-    }
     LOG(1, __FILE__, __LINE__, " initial inducer success\n");
     return mtx;
 }
@@ -730,7 +816,7 @@ void heap_update( Heap* heap, Reaction *reaction){
 */
 double cal_new_tau(double r_old, double r_new, double t_old, double t){
     if( r_new< FLT_EPSILON) return DBL_MAX;
-    if( r_old< FLT_EPSILON) return (- log(rand()/(double)(RAND_MAX))/(r_new)+ t);
+    if( r_old< FLT_EPSILON) return (- log(ldexp(pcg32_random(), -32))/(r_new)+ t);
     return (r_old/r_new)*(t_old- t)+ t;
 }
 double get_tau( Heap* heap, NINT n){
@@ -745,42 +831,118 @@ void dump_heap( Heap* heap){
     printf("end dump heap\n");
     fflush(stdout);
 }
-void print_inducer( Graph* graph, Transition* tran, Status* sts, Event* evt, FILE* fil_out){
-    fprintf( fil_out, " [");
-    if( tran->nodal_trn[evt->ni][evt->nj]> 0){
-        fprintf( fil_out, "%d", evt->ns);
-    }
-    for( int layer= 0; layer< graph->L; layer++){
-        fprintf( fil_out, "],[");
-        if( tran->edge_trn[layer][evt->ni][evt->nj]> 0){
-            int flag= 0;
-            if( graph->weighted){
-                for( int i= graph->index[layer][evt->ns]; i< graph->index[layer][evt->ns+1]; i++){
-                    if( sts->init_lst[graph->edge_w[layer][i].j] == tran->inducer_lst[layer]){
-                        if( flag){
-                            fprintf( fil_out, ",");
-                        }
-                        else{
-                            flag= 1;
-                        }
-                        fprintf( fil_out, "%d", graph->edge_w[layer][i].j);
-                    }
-                }
-            }
-            else{
-                for( int i= graph->index[layer][evt->ns]; i< graph->index[layer][evt->ns+1]; i++){
-                    if( sts->init_lst[graph->edge[layer][i].j] == tran->inducer_lst[layer]){
-                        if( flag){
-                            fprintf( fil_out, ",");
-                        }
-                        else{
-                            flag= 1;
-                        }
-                        fprintf( fil_out, "%d", graph->edge[layer][i].j);
-                    }
-                }
+void print_inducer( Graph* graph, Transition* tran, Status *sts, Event* evt, FILE* fil_tra, double elapse_tim, double* p_raw_rat_lst){
+    int weighted_rate_sum = 0;
+    int random_index;
+    // if the node's rate is less than double the lowest edge rate, we have one inducer'
+    if( p_raw_rat_lst[evt->ns] < (1.9*tran->edge_trn[0][0][1])){
+        // got through each edge of the newly infected node
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is an inducer, that is it
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                return;
             }
         }
     }
-    fprintf( fil_out, "]");
+    else{
+        // got through each edge of the newly infected node
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is 2 or 5, increment rates by 11, 3 or 4 by 20
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                weighted_rate_sum += 11;
+            }
+            else if( sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4){
+                weighted_rate_sum += 20;
+            }
+
+        }
+        // get a random integer up to the rates total
+        random_index = pcg32_boundedrand(weighted_rate_sum);
+        // reset rates, go through again until rates reaches the index
+        weighted_rate_sum = 0;
+        for( int i= graph->index[0][evt->ns]; i< graph->index[0][evt->ns+1]; i++){
+            // if the status of the node at the other end of the edge is 2 or 5, increment rates by 11, 3 or 4 by 20
+            if( sts->init_lst[graph->edge[0][i].j] == 2 ||
+            sts->init_lst[graph->edge[0][i].j] == 5){
+                weighted_rate_sum += 11;
+                if( weighted_rate_sum > random_index){
+                    fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                    return;
+                }
+            }
+            else if( sts->init_lst[graph->edge[0][i].j] == 3 ||
+            sts->init_lst[graph->edge[0][i].j] == 4){
+                weighted_rate_sum += 20;
+                if( weighted_rate_sum > random_index){
+                    fprintf( fil_tra, "%d\t%d\t%lf\n", graph->edge[0][i].j, evt->ns,elapse_tim);
+                    return;
+                }
+            }
+
+        }
+
+    }
+}
+
+void generate_graph(Graph* graph){
+
+    const int m = 8;         // Initial number of nodes
+    const int n = 5000000;    // Total number of nodes to be generated
+    int i, j, k;
+    int new_nodes_edge_targets[m];
+    int *edge_ends = malloc((m + 2 * m * (n - m)) * sizeof(int));
+    size_t layer;
+
+    if (edge_ends == NULL) {
+        perror("Error allocating memory");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the edge end list with eight unconnected nodes
+    for (i = 0; i < m; ++i) {
+        edge_ends[i] = i;
+    }
+
+    // Add nodes until we have n total
+    for (i = m; i < n; ++i) {
+        // For each new node, connect it with edges to m different nodes from the edge end list
+        for (j = 0; j < m; ++j) {
+            int is_duplicate;
+            do {
+                // draw random node from the edge end list (this provides preferential attachment)
+                new_nodes_edge_targets[j] = edge_ends[(int)pcg32_boundedrand(m + 2 * m * (i - m))];
+                // Check each new node against the previous ones and draw again if duplicate
+                is_duplicate = 0;
+                for (k = 0; k < j; ++k) {
+                    if (new_nodes_edge_targets[k] == new_nodes_edge_targets[j]) {
+                        is_duplicate = 1;
+                        break;
+                    }
+                }
+            } while (is_duplicate);
+        }
+        // for each edge of the new node, add the nodes to edge ends and the edges to the edge list
+        for (j = 0; j < m; ++j) {
+            // Add the nodes to edge ends
+            edge_ends[m + 2 * m * (i - m) + 2 * j] = i;
+            edge_ends[m + 2 * m * (i - m) + 2 * j + 1] = new_nodes_edge_targets[j];
+            // Add the edges to the edge list
+            graph->edge[0][m*(i - m) + j].i= i;
+            graph->edge[0][m*(i - m) + j].j= new_nodes_edge_targets[j];
+            graph->edge[0][graph->E[0]/2+ m*(i - m) + j].i= new_nodes_edge_targets[j];
+            graph->edge[0][graph->E[0]/2+ m*(i - m) + j].j= i;
+        }
+    }
+    free(edge_ends);
+    // sort the ede list and then copy to the other layers
+    Edge_tim_sort( graph->edge[0], graph->E[0]);
+    for( layer= 1; layer< graph->L; layer++){
+        memcpy(graph->edge[layer], graph->edge[0], graph->E[0] * sizeof(Edge));
+    }
 }
